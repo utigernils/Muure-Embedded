@@ -60,18 +60,22 @@ async def main():
                 continue
             
             # Difference calculation (print-only for now)
+            logger.info("Step 2: Analyzing image...")
             try:
                 if os.path.exists(prev_png_path):
                     regions = ImageDifference.compare_images(prev_png_path, png_path)
-                    print(regions)
                     logger.info(f"Differences (regions): {regions}")
+
+                    for region in regions:
+                        if ImageDifference.bbox_has_non_binary_pixels(png_path, region):
+                            logger.info(f"Region with non-binary pixels detected: {region}")
                 else:
                     logger.info("No previous render available; skipping diff.")
             except Exception as e:
                 logger.warning(f"Difference calculation failed: {e}")
 
-            # 2. Convert
-            logger.info("Step 2: Converting image...")
+            # 3. Convert
+            logger.info("Step 3: Converting image...")
             try:
                 converter.convert(png_path, bmp_path)
             except Exception as e:
@@ -79,16 +83,16 @@ async def main():
                 await asyncio.sleep(10)
                 continue
             
-            # 3. Display
-            logger.info("Step 3: Displaying image...")
+            # 4. Display
+            logger.info("Step 4: Displaying image...")
             try:
                 display.display_image(bmp_path)
                 display.sleep()
             except Exception as e:
                 logger.error(f"Display failed: {e}")
             
-            logger.info("Cycle complete. Waiting for 60 seconds...")
-            await asyncio.sleep(2)
+            logger.info(f"Cycle complete. Waiting for {config.get("REFRESH_TIME")} seconds...")
+            await asyncio.sleep(str(config.get("REFRESH_TIME")))
 
     except KeyboardInterrupt:
         logger.info("Exiting...")
