@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageChops, ImageFilter
 
 class ImageDifference:
     LEVELS = [255, 192, 128, 0]
@@ -107,19 +107,34 @@ class ImageDifference:
         return regions
 
     @staticmethod
-    def bbox_has_non_binary_pixels(path: str, bbox: tuple) -> bool:
+    def bbox_has_non_binary_pixels(
+        path: str,
+        bbox: tuple,
+        *,
+        threshold: int = 127,
+        delta: int = 40,
+        edge_radius: int = 2,
+        min_fraction: float = 0.01,
+    ) -> bool:
         """
         Check if a bounding box region contains any grayscale pixels that are not
-        strictly binary (0 or 255).
+        strictly binary (0 or 255), while being robust to browser anti-aliasing
+        (grayscale edge smoothing).
 
         Args:
             path: Path to the BMP image to analyze.
             bbox: A tuple (x, y, w, h) in pixel coordinates, same format as
                   returned by `compare_images`.
+                Optional tuning via keyword-only args (with safe defaults):
+                        - threshold: grayscale threshold to binarize for edge detection (default 127)
+                        - delta: tolerance around 0 and 255 still considered binary (default 40)
+                        - edge_radius: pixels of edge band to ignore due to anti-aliasing (default 2)
+                        - min_fraction: minimum fraction of mid-gray pixels OUTSIDE the edge band
+                            to treat the region as truly non-binary (default 0.01 = 1%)
 
         Returns:
-            True if any pixel within the region has a grayscale value other than
-            0 or 255; otherwise False.
+            True if there is a meaningful amount of non-binary grayscale away from
+            anti-aliased edges; otherwise False.
         """
         if not isinstance(bbox, tuple) or len(bbox) != 4:
             raise ValueError("bbox must be a tuple of (x, y, w, h)")
@@ -129,7 +144,7 @@ class ImageDifference:
             return False
 
         img = Image.open(path)
-        # Analyze in grayscale as requested
+        # Analyze in grayscale
         gray = img.convert("L")
 
         # Clamp bbox to image bounds to be safe
@@ -142,13 +157,40 @@ class ImageDifference:
             return False
 
         region = gray.crop((x0, y0, x1, y1))
-        px = region.load()
-        rw, rh = region.size
 
-        # Scan for any non-binary grayscale value
-        for j in range(rh):
-            for i in range(rw):
-                val = px[i, j]
-                if val != 0 and val != 255:
-                    return True
-        return False
+        # 1) Create a binary version for edge detection
+        bw = region.point(lambda p: 255 if p >= threshold else 0, mode="L")
+
+        # 2) Compute a thin edge band via morphological gradient (dilate - erode)
+        dil = bw.filter(ImageFilter.MaxFilter(3))
+        ero = bw.filter(ImageFilter.MinFilter(3))
+        edge_band = ImageChops.difference(dil, ero)  # 255 on edges, 0 elsewhere
+
+        # 3) Expand the edge band to cover anti-aliased pixels (edge_radius)
+        #    Use an odd kernel size: 2*edge_radius+1
+        if edge_radius > 0:
+            k = max(1, 2 * edge_radius + 1)
+            edge_band = edge_band.filter(ImageFilter.MaxFilter(k))
+
+        # 4) Build a mask of mid-gray pixels (not near 0/255)
+        mid_gray = region.point(
+            lambda v: 255 if (delta <= v <= 255 - delta) else 0,
+            mode="L",
+        )
+
+        # 5) Consider only mid-gray pixels OUTSIDE the (expanded) edge band
+        #    outside_edges = 255 where edge_band == 0, else 0
+        outside_edges = edge_band.point(lambda v: 0 if v > 0 else 255, mode="L")
+        mid_gray_outside = ImageChops.multiply(mid_gray, outside_edges)
+
+        # 6) Compute fraction of mid-gray outside edges
+        data_outside = list(outside_edges.getdata())
+        valid_area = sum(1 for t in data_outside if t > 0)
+        if valid_area == 0:
+            # Entire region is edge band; treat as binary for our purposes
+            return False
+
+        non_binary_pixels = sum(1 for v in mid_gray_outside.getdata() if v > 0)
+        fraction = non_binary_pixels / valid_area
+
+        return fraction >= min_fraction
