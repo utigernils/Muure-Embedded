@@ -1,12 +1,22 @@
 import os
 import logging
 import time
+from config import Config
 from PIL import Image
-from waveshare_epd import epd7in5_V2
+
+config = Config()
+
+if config.get("DISPLAY_ENVIRONMENT") == "development":
+    from waveshare_epd import emulator
+else:
+    from waveshare_epd import epd7in5_V2
 
 class EInkDisplay:
     def __init__(self):
-        self.epd = epd7in5_V2.EPD()
+        if config.get("DISPLAY_ENVIRONMENT") == "development":
+            self.epd = emulator.EPD()
+        else:
+            self.epd = epd7in5_V2.EPD()
         self.logger = logging.getLogger(__name__)
 
     def init_display(self):
