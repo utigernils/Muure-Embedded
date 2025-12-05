@@ -105,3 +105,50 @@ class ImageDifference:
             regions.append((x0, y0, w, h))
 
         return regions
+
+    @staticmethod
+    def bbox_has_non_binary_pixels(path: str, bbox: tuple) -> bool:
+        """
+        Check if a bounding box region contains any grayscale pixels that are not
+        strictly binary (0 or 255).
+
+        Args:
+            path: Path to the BMP image to analyze.
+            bbox: A tuple (x, y, w, h) in pixel coordinates, same format as
+                  returned by `compare_images`.
+
+        Returns:
+            True if any pixel within the region has a grayscale value other than
+            0 or 255; otherwise False.
+        """
+        if not isinstance(bbox, tuple) or len(bbox) != 4:
+            raise ValueError("bbox must be a tuple of (x, y, w, h)")
+
+        x, y, w, h = bbox
+        if w <= 0 or h <= 0:
+            return False
+
+        img = Image.open(path)
+        # Analyze in grayscale as requested
+        gray = img.convert("L")
+
+        # Clamp bbox to image bounds to be safe
+        width, height = gray.size
+        x0 = max(0, x)
+        y0 = max(0, y)
+        x1 = min(x0 + w, width)
+        y1 = min(y0 + h, height)
+        if x0 >= x1 or y0 >= y1:
+            return False
+
+        region = gray.crop((x0, y0, x1, y1))
+        px = region.load()
+        rw, rh = region.size
+
+        # Scan for any non-binary grayscale value
+        for j in range(rh):
+            for i in range(rw):
+                val = px[i, j]
+                if val != 0 and val != 255:
+                    return True
+        return False
