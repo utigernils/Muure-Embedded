@@ -2,3 +2,5 @@ waveshare_epd/__pycache__/
 /__pycache__
 *.bmp
 *.png
+.env
+/.venv

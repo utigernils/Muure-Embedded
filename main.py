@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+from config import Config
 from render import Renderer
 from convert import FourToneConverter
 from display import EInkDisplay
@@ -18,9 +19,13 @@ logging.basicConfig(
 logger = logging.getLogger("Main")
 
 async def main():
+    config = Config()
     renderer = Renderer()
     converter = FourToneConverter()
     display = EInkDisplay()
+
+    if config.get("DISPLAY_ENVIRONMENT") == "development":
+        logger.info("The display is being emulated in development mode.")
 
     # Ensure directories exist
     os.makedirs("renders", exist_ok=True)
