@@ -6,6 +6,7 @@ from config import Config
 from render import Renderer
 from convert import FourToneConverter
 from display import EInkDisplay
+from diference import ImageDifference
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +32,7 @@ async def main():
     os.makedirs("renders", exist_ok=True)
 
     png_path = os.path.abspath("renders/output.png")
+    prev_png_path = os.path.abspath("renders/output_prev.png")
     bmp_path = os.path.abspath("renders/output.bmp")
 
     # Initial clear
@@ -38,8 +40,19 @@ async def main():
 
     try:
         while True:
+            regions = None
+            partial_update = True
+
             logger.info("Starting display cycle...")
             
+            # Move last output to previous to enable difference calculation
+            if os.path.exists(png_path):
+                try:
+                    os.replace(png_path, prev_png_path)
+                    logger.info("Previous render archived for diff calculation.")
+                except Exception as e:
+                    logger.warning(f"Could not archive previous render: {e}")
+
             # 1. Render
             logger.info("Step 1: Rendering page...")
             try:
@@ -49,8 +62,28 @@ async def main():
                 await asyncio.sleep(10)
                 continue
             
-            # 2. Convert
-            logger.info("Step 2: Converting image...")
+            # Difference calculation (print-only for now)
+            logger.info("Step 2: Analyzing image...")
+            try:
+                if os.path.exists(prev_png_path):
+                    regions = ImageDifference.compare_images(prev_png_path, png_path)
+
+                    if len(regions) > 0:
+                        logger.info(f"Differences (regions): {regions}")
+                    else:
+                        logger.info("No differences found")
+
+                    for region in regions:
+                        if ImageDifference.bbox_has_non_binary_pixels(png_path, region):
+                            partial_update = False
+                            logger.info(f"Region with non-binary pixels detected: {region}")
+                else:
+                    logger.info("No previous render available; skipping diff.")
+            except Exception as e:
+                logger.warning(f"Difference calculation failed: {e}")
+
+            # 3. Convert
+            logger.info("Step 3: Converting image...")
             try:
                 converter.convert(png_path, bmp_path)
             except Exception as e:
@@ -58,16 +91,20 @@ async def main():
                 await asyncio.sleep(10)
                 continue
             
-            # 3. Display
-            logger.info("Step 3: Displaying image...")
+            # 4. Display
+            logger.info("Step 4: Displaying image...")
             try:
-                display.display_image(bmp_path)
-                display.sleep()
+                if partial_update and regions and len(regions) > 0:
+                    logger.info("Performing partial update with detected regions.")
+                    display.partial_update(bmp_path, regions)
+                else:
+                    logger.info("Performing full 4-gray update.")
+                    display.update(bmp_path)
             except Exception as e:
                 logger.error(f"Display failed: {e}")
             
-            logger.info("Cycle complete. Waiting for 60 seconds...")
-            await asyncio.sleep(60)
+            logger.info(f"Cycle complete. Waiting for {config.get('REFRESH_TIME')} seconds...")
+            await asyncio.sleep(int(config.get("REFRESH_TIME")))
 
     except KeyboardInterrupt:
         logger.info("Exiting...")
