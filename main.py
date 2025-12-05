@@ -40,6 +40,9 @@ async def main():
 
     try:
         while True:
+            regions = None
+            partial_update = True
+
             logger.info("Starting display cycle...")
             
             # Move last output to previous to enable difference calculation
@@ -64,10 +67,15 @@ async def main():
             try:
                 if os.path.exists(prev_png_path):
                     regions = ImageDifference.compare_images(prev_png_path, png_path)
-                    logger.info(f"Differences (regions): {regions}")
+
+                    if len(regions) > 0:
+                        logger.info(f"Differences (regions): {regions}")
+                    else:
+                        logger.info("No differences found")
 
                     for region in regions:
                         if ImageDifference.bbox_has_non_binary_pixels(png_path, region):
+                            partial_update = False
                             logger.info(f"Region with non-binary pixels detected: {region}")
                 else:
                     logger.info("No previous render available; skipping diff.")
@@ -86,12 +94,16 @@ async def main():
             # 4. Display
             logger.info("Step 4: Displaying image...")
             try:
-                display.display_image(bmp_path)
-                display.sleep()
+                if partial_update and regions and len(regions) > 0:
+                    logger.info("Performing partial update with detected regions.")
+                    display.partial_update(bmp_path, regions)
+                else:
+                    logger.info("Performing full 4-gray update.")
+                    display.update(bmp_path)
             except Exception as e:
                 logger.error(f"Display failed: {e}")
             
-            logger.info(f"Cycle complete. Waiting for {config.get("REFRESH_TIME")} seconds...")
+            logger.info(f"Cycle complete. Waiting for {config.get('REFRESH_TIME')} seconds...")
             await asyncio.sleep(int(config.get("REFRESH_TIME")))
 
     except KeyboardInterrupt:
