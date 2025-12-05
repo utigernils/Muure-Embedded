@@ -13,7 +13,7 @@ class ImageDifference:
         return img
 
     @staticmethod
-    def compare_images(path_a: str, path_b: str, block_size: int = 8, padding: int = 1, force_square: bool = False) -> list:
+    def compare_images(path_a: str, path_b: str, block_size: int = 8, padding: int = 3, force_square: bool = False) -> list:
         """
         Compare two black/white BMP images and return a list of regions
         that cover changed spots.
