@@ -13,18 +13,21 @@ class ImageDifference:
         return img
 
     @staticmethod
-    def compare_images(path_a: str, path_b: str, block_size: int = 16) -> list:
+    def compare_images(path_a: str, path_b: str, block_size: int = 8, padding: int = 1, force_square: bool = False) -> list:
         """
-        Compare two black/white BMP images and return list of square regions
+        Compare two black/white BMP images and return a list of regions
         that cover changed spots.
 
         Args:
             path_a: Path to first image (previous reference).
             path_b: Path to second image (new image).
-            block_size: Size of square blocks to scan and group differences.
+            block_size: Size of square blocks to scan and group differences (smaller yields more zones).
+            padding: Extra pixels added around detected regions for safer coverage.
+            force_square: If True, expands rectangles to squares; by default keeps tight rectangles.
 
         Returns:
-            List of tuples (x, y, w, h) representing squares around changes.
+            List of tuples (x, y, w, h) representing rectangles around changes
+            (squares if force_square=True).
         """
         img_a = ImageDifference._load_bw(path_a)
         img_b = ImageDifference._load_bw(path_b)
@@ -34,13 +37,8 @@ class ImageDifference:
 
         width, height = img_a.size
 
-        # Access pixels as bytes for speed
-        pa = img_a.tobytes()
-        pb = img_b.tobytes()
-
         # Identify blocks with any differing pixel
         changed_blocks = set()
-        stride = width  # for mode "1", Pillow packs bits; but tobytes returns packed bits per row
 
         # Convert to unpacked boolean arrays for reliable per-pixel comparison
         a_pixels = img_a.convert("L")
@@ -83,21 +81,24 @@ class ImageDifference:
             min_by = min(y for _, y in cluster)
             max_by = max(y for _, y in cluster)
 
-            # Convert to pixel coordinates, expand to square
+            # Convert to pixel coordinates
             x0 = min_bx * block_size
             y0 = min_by * block_size
             w = (max_bx - min_bx + 1) * block_size
             h = (max_by - min_by + 1) * block_size
 
-            # Make square by expanding the smaller side
-            if w > h:
-                h = w
-            elif h > w:
-                w = h
+            # Optional: make square by expanding the smaller side
+            if force_square:
+                if w > h:
+                    h = w
+                elif h > w:
+                    w = h
 
             # Clamp to image bounds
-            x1 = min(x0 + w, width)
-            y1 = min(y0 + h, height)
+            x0 = max(0, x0 - padding)
+            y0 = max(0, y0 - padding)
+            x1 = min(x0 + w + 2 * padding, width)
+            y1 = min(y0 + h + 2 * padding, height)
             w = x1 - x0
             h = y1 - y0
 
