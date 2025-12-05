@@ -29,8 +29,9 @@ class ImageDifference:
             List of tuples (x, y, w, h) representing rectangles around changes
             (squares if force_square=True).
         """
-        img_a = ImageDifference._load_bw(path_a)
-        img_b = ImageDifference._load_bw(path_b)
+        # Load images in 0-255 grayscale for nuanced comparison
+        img_a = Image.open(path_a).convert("L")
+        img_b = Image.open(path_b).convert("L")
 
         if img_a.size != img_b.size:
             raise ValueError(f"Image sizes differ: {img_a.size} vs {img_b.size}")
@@ -40,15 +41,14 @@ class ImageDifference:
         # Identify blocks with any differing pixel
         changed_blocks = set()
 
-        # Convert to unpacked boolean arrays for reliable per-pixel comparison
-        a_pixels = img_a.convert("L")
-        b_pixels = img_b.convert("L")
-        a_px = a_pixels.load()
-        b_px = b_pixels.load()
+        # Access raw grayscale pixel values (0-255)
+        a_px = img_a.load()
+        b_px = img_b.load()
 
         for y in range(0, height):
             for x in range(0, width):
-                if (a_px[x, y] > 127) != (b_px[x, y] > 127):
+                # Mark block as changed if grayscale values differ
+                if a_px[x, y] != b_px[x, y]:
                     bx = x // block_size
                     by = y // block_size
                     changed_blocks.add((bx, by))
