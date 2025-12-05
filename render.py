@@ -42,8 +42,8 @@ class Renderer:
                     self.logger.info(f"Attempting to load {self.url} (attempt {attempt + 1}/{max_retries})...")
                     await page.goto(self.url, wait_until="domcontentloaded", timeout=30000)
                     
-                    self.logger.info("Page loaded, waiting for content to render...")
-                    await asyncio.sleep(3)
+                    self.logger.info(f"Page loaded, waiting {self.config.get("PAGE_BUFFER_TIME")} seconds for content to render...")
+                    await asyncio.sleep(int(self.config.get("PAGE_BUFFER_TIME")))
                     
                     output_file = Path(output_path)
                     await page.screenshot(path=str(output_file), full_page=False)
