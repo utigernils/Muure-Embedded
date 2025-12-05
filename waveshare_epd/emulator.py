@@ -45,7 +45,7 @@ class EPD:
         logger.debug("(EMULATED) Getting buffer from image")
         return bytearray()
     
-    def getBuffer_4Gray(self, image):
+    def getbuffer_4Gray(self, image):
         logger.debug("(EMULATED) Getting 4Gray buffer from image")
         return bytearray()
     
