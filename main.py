@@ -92,7 +92,7 @@ async def main():
                 logger.error(f"Display failed: {e}")
             
             logger.info(f"Cycle complete. Waiting for {config.get("REFRESH_TIME")} seconds...")
-            await asyncio.sleep(str(config.get("REFRESH_TIME")))
+            await asyncio.sleep(int(config.get("REFRESH_TIME")))
 
     except KeyboardInterrupt:
         logger.info("Exiting...")
