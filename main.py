@@ -6,6 +6,7 @@ from config import Config
 from render import Renderer
 from convert import FourToneConverter
 from display import EInkDisplay
+from diference import ImageDifference
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +32,7 @@ async def main():
     os.makedirs("renders", exist_ok=True)
 
     png_path = os.path.abspath("renders/output.png")
+    prev_png_path = os.path.abspath("renders/output_prev.png")
     bmp_path = os.path.abspath("renders/output.bmp")
 
     # Initial clear
@@ -40,6 +42,14 @@ async def main():
         while True:
             logger.info("Starting display cycle...")
             
+            # Move last output to previous to enable difference calculation
+            if os.path.exists(png_path):
+                try:
+                    os.replace(png_path, prev_png_path)
+                    logger.info("Previous render archived for diff calculation.")
+                except Exception as e:
+                    logger.warning(f"Could not archive previous render: {e}")
+
             # 1. Render
             logger.info("Step 1: Rendering page...")
             try:
@@ -49,6 +59,17 @@ async def main():
                 await asyncio.sleep(10)
                 continue
             
+            # Difference calculation (print-only for now)
+            try:
+                if os.path.exists(prev_png_path):
+                    regions = ImageDifference.compare_images(prev_png_path, png_path)
+                    print(regions)
+                    logger.info(f"Differences (regions): {regions}")
+                else:
+                    logger.info("No previous render available; skipping diff.")
+            except Exception as e:
+                logger.warning(f"Difference calculation failed: {e}")
+
             # 2. Convert
             logger.info("Step 2: Converting image...")
             try:
@@ -67,7 +88,7 @@ async def main():
                 logger.error(f"Display failed: {e}")
             
             logger.info("Cycle complete. Waiting for 60 seconds...")
-            await asyncio.sleep(60)
+            await asyncio.sleep(2)
 
     except KeyboardInterrupt:
         logger.info("Exiting...")
