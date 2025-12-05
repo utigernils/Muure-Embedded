@@ -4,6 +4,7 @@ Manages headless browser automation to render the frontend as PNG.
 """
 import asyncio
 import logging
+from config import Config
 from playwright.async_api import async_playwright
 from pathlib import Path
 
@@ -12,7 +13,8 @@ class Renderer:
     """Handles headless browser rendering to PNG."""
     
     def __init__(self):
-        self.url = "http://localhost:8000/"
+        self.config = Config()
+        self.url = self.config.get("MUURE_SERVER")
         self.width = 800
         self.height = 480
         self.logger = logging.getLogger(__name__)
