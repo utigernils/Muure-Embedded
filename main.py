@@ -8,6 +8,7 @@ from render import Renderer
 from convert import FourToneConverter
 from display import EInkDisplay
 from buttons import ButtonHandler
+from leds import LEDController
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +29,7 @@ class DisplayManager:
         self.renderer = Renderer()
         self.converter = FourToneConverter()
         self.display = EInkDisplay()
+        self.led_controller = LEDController(self.config)
         
         # Event to signal immediate refresh
         self.refresh_event = asyncio.Event()
@@ -55,32 +57,45 @@ class DisplayManager:
         async with self.refresh_lock:
             logger.info("Starting display cycle...")
             
-            # 1. Render
-            logger.info("Step 1: Rendering page...")
-            try:
-                await self.renderer.render_to_png(self.png_path)
-            except Exception as e:
-                logger.error(f"Rendering failed: {e}")
-                raise
+            # Start loading animation
+            self.led_controller.loading()
             
-            # 2. Convert
-            logger.info("Step 2: Converting image...")
             try:
-                self.converter.convert(self.png_path, self.bmp_path)
-            except Exception as e:
-                logger.error(f"Conversion failed: {e}")
+                # 1. Render
+                logger.info("Step 1: Rendering page...")
+                try:
+                    await self.renderer.render_to_png(self.png_path)
+                except Exception as e:
+                    logger.error(f"Rendering failed: {e}")
+                    self.led_controller.fault()
+                    raise
+                
+                # 2. Convert
+                logger.info("Step 2: Converting image...")
+                try:
+                    self.converter.convert(self.png_path, self.bmp_path)
+                except Exception as e:
+                    logger.error(f"Conversion failed: {e}")
+                    self.led_controller.fault()
+                    raise
+                
+                # 3. Display
+                logger.info("Step 3: Displaying image...")
+                try:
+                    self.display.display_image(self.bmp_path)
+                    self.display.sleep()
+                except Exception as e:
+                    logger.error(f"Display failed: {e}")
+                    self.led_controller.fault()
+                    raise
+                
+                logger.info("Display cycle complete")
+                # Show success animation
+                self.led_controller.success()
+                
+            except Exception:
+                # Keep the fault animation running and re-raise
                 raise
-            
-            # 3. Display
-            logger.info("Step 3: Displaying image...")
-            try:
-                self.display.display_image(self.bmp_path)
-                self.display.sleep()
-            except Exception as e:
-                logger.error(f"Display failed: {e}")
-                raise
-            
-            logger.info("Display cycle complete")
     
     async def wait_with_interrupt(self, duration: int):
         """Wait for specified duration or until refresh event is triggered."""
@@ -119,6 +134,7 @@ class DisplayManager:
                     await self.perform_display_cycle()
                 except Exception as e:
                     logger.error(f"Display cycle failed: {e}")
+                    # Fault animation is already triggered in perform_display_cycle
                     # Wait before retrying
                     await asyncio.sleep(10)
                     continue
@@ -137,6 +153,11 @@ class DisplayManager:
             try:
                 self.display.clear()
                 self.display.sleep()
+            except:
+                pass
+            # Turn off LEDs and cleanup
+            try:
+                self.led_controller.cleanup()
             except:
                 pass
 
