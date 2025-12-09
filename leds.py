@@ -148,7 +148,7 @@ class LEDController:
                 # Light up current pixel
                 self.pixels[i] = self.colors["blue"]
                 self.pixels.show()
-                time.sleep(0.2)
+                time.sleep(0.1)
     
     def fault(self):
         """Display fault indication with red pulsing effect."""
