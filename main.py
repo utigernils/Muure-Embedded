@@ -66,8 +66,8 @@ async def main():
             except Exception as e:
                 logger.error(f"Display failed: {e}")
             
-            logger.info("Cycle complete. Waiting for 60 seconds...")
-            await asyncio.sleep(60)
+            logger.info(f"Cycle complete. Waiting for {config.get('DISPLAY_REFRESH_INTERVAL', 60)} seconds...")
+            await asyncio.sleep(int(config.get("DISPLAY_REFRESH_INTERVAL", 60)))
 
     except KeyboardInterrupt:
         logger.info("Exiting...")
