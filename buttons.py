@@ -197,3 +197,35 @@ class ButtonHandler:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
+
+
+if __name__ == "__main__":
+    """
+    Run the button handler as a standalone script for testing.
+    Shows real-time button states.
+    """
+    import os
+    
+    button_handler = ButtonHandler()
+    button_handler._setup_buttons()
+    
+    try:
+        while True:
+            # Clear console
+            os.system('clear' if os.name == 'posix' else 'cls')
+            
+            if button_handler.config.get("DISPLAY_ENVIRONMENT") == "development":
+                print("Button A: [Press 'a'] | Button B: [Press 'd'] | Quit: [Press 'q']")
+            elif GPIO_AVAILABLE:
+                # Read button states (active low)
+                button_a_state = "PRESSED" if GPIO.input(button_handler.BUTTON_LEFT_PIN) else "RELEASED"
+                button_b_state = "PRESSED" if GPIO.input(button_handler.BUTTON_RIGHT_PIN) else "RELEASED"
+                print(f"Button A: {button_a_state} | Button B: {button_b_state}")
+            else:
+                print("GPIO not available")
+            
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    except Exception as e:
+        print(f"Error: {e}")
