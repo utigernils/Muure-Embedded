@@ -62,9 +62,16 @@ class LEDController:
         
         # Handle case where block period crosses midnight
         if self.block_start_hour > self.block_end_hour:
-            return current_hour >= self.block_start_hour or current_hour < self.block_end_hour
+            is_blocked = current_hour >= self.block_start_hour or current_hour < self.block_end_hour
         else:
-            return self.block_start_hour <= current_hour < self.block_end_hour
+            is_blocked = self.block_start_hour <= current_hour < self.block_end_hour
+        
+        if is_blocked:
+            for i in range(self.num_pixels):
+                self.pixels[i] = self.colors["off"]
+            self.pixels.show()
+        
+        return is_blocked
     
     def _stop_current_animation(self):
         """Stop any currently running animation."""
